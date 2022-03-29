@@ -36,6 +36,8 @@ key-value 형식으로 바이트 오프셋에 맵핑해 인메모리 해시 맵�
 
 각 세그먼트는 키를 파일 오프셋에 매핑한 자체 인메모리 해시 테이블을 갖는다.
 
+java의 hashmap 관련 : https://d2.naver.com/helloworld/831311
+
 ***고민 요소***
 
 - 파일 형식
@@ -91,6 +93,8 @@ LSM 트리의 기본 개념은 백그라운드에서 연쇄적으로 SS 테이�
 
 e.g. Lucene's term dictionary
 
+LSM 트리 관련 더 구체적이지만 간단한 설명 : https://www.secmem.org/blog/2021/02/21/lsm-tree/
+
 ### Optimizing performance
 
 - 존재하지 않는 키 찾을 때 오래 걸림. 따라서 Bloom Filter(집합 내용을 approximating한 구조. 키 유무를 알려줌)
@@ -126,7 +130,7 @@ B Tree에 존재하는 키 값 갱신은, 리프 페이지를 찾고 페이지 �
 
 새로운 키를 수용한 페이지에 여유공간이 없다면 페이지 하나를 반쯤 채워진 페이지 둘로 나누고 상위 페이지가 새로운 키 범위의 하위 부분들을 알 수 있게 갱신한다.
 
-https://www.cs.usfca.edu/~galles/visualization/BTree.html
+B-tree visualization : https://www.cs.usfca.edu/~galles/visualization/BTree.html
 
 트리는 계속 균형을 유지하며 depth는 $O(logn)$이다.
 
@@ -186,3 +190,89 @@ B tree는 기본적으로 새 데이터를 디스크 상의 페이지에 덮어�
 
  ## 트랜잭션 처리나 분석?
  
+| 특성 | OLTP(online transaction processing) | OLAP(online analytic processing) |
+| ---- | ---- | ---- |
+| 주요 읽기 패턴 | 질의당 적은 수의 레코드, 키 기준으로 가져옴 | 많은 레코드에 대한 집계 |
+| 주요 쓰기 패턴 | 임의접근, 사용자 입력을 낮은 지연 시간으로 기록 | 대규모 불러오기 또는 이벤트 스트림 |
+| 주요 사용처 | 웹 애플리케이션을 통한 최종 사용자/소비자 | 의사결정 지원을 위한 내부 분석가 |
+| 데이터 표현 | 데이터의 최신 상태 | 시간이 지나며 일어난 이벤트 이력 |
+| 데이터셋 크기 | 기가바이트에서 테라바이트 | 테라바이트에서 페타바이트 | 
+
+### Data warehousing
+
+ad hoc analytic query는 비싸기 때문에 이를 OLTP DB에 실행하는 것을 꺼려함.
+
+반면, 데이터 웨어하우스는 OLTP에 영향을 주지 않고 질의할 수 있는 개별 DB.
+
+데이터는 OLTP 데이터베이스에서 주기적으로 extract하고 분석 친화적인 스키마로 transform하고 깨끗하게 정리한 다음 데이터 웨어하우스에 load한다. **(ETL)**
+
+### OLTP DB vs Data Warehouse
+
+둘 다 SQL 인터페이스를 써서 비슷할 거 같지만 서로 다른 질의 패턴으로 인해 내부는 굉장히 다르다.
+
+### Star schema & Snowflake schema
+
+분석에서는 데이터 모델의 다양성이 훨씬 적으며, 보통 정형화된 방식인 별 모양 스키마를 사용한다.
+
+스키마의 중심에는 소위 Fact table이 있고, 테이블의 각 로우는 특정 시각에 발생한 이벤트에 해당한다.
+
+또한 외래 키 참조가 존재하는데, 참조를 따라가면 나오는 테이블을 dimension table이라고 한다.
+
+차원은 who, when, where, what, how, why를 나타낸다.
+
+***Star schema의 변형 == Snowflake schema***
+
+차원이 하위 차원으로 더 세분화 된다. 하지만 작업하기 쉽다는 이유로 star schema가 더 선호된다고 한다.
+
+## Column 지향 저장소
+
+테이블에 엄청나게 많은 로우와 페타바이트 데이터가 있다면 효율적으로 저장하고 질의하는 것은 어려운 문제가 된다.
+
+차원테이블은 보통 수백만 로우 정도로 훨씬 적어서 "저장"에 집중해보자.
+
+Fact table은 칼럼이 보통 100개 이상이지만 실제 질의는 한 번에 4~5개 컬럼에만 접근한다.
+
+***칼럼 지향 저장소 : 모든 값을 하나의 로우에 함께 저장하지 않는 대신 각 칼럼별로 모든 값을 함께 저장한다. 각 칼럼을 개별 파일에 저장하면 질의에 사용되는 칼럼만 읽고 구분 분석하면 된다.***
+
+각 칼럼 파일에 포함된 로우가 같은 순서인 점에 의존한다.
+
+### Column 압축
+
+칼럼에서 고유 수는 로우 수에 비해 적다. 따라서 n개의 고유 값을 가진 칼럼을 가져와 n개의 개별 비트맵으로 변환할 수 있다.
+
+이런 ***bitmap encoding***을 통해 데이터를 효율적으로 압축할 수 있다.
+
+***참고 : Run-length encoding***
+
+https://ko.wikipedia.org/wiki/%EB%9F%B0_%EB%A0%9D%EC%8A%A4_%EB%B6%80%ED%98%B8%ED%99%94
+
+Parquet 관련 글 : https://engineering.vcnc.co.kr/2018/05/parquet-and-spark
+
+### 메모리 대역폭과 벡터화 처리
+
+수백만 로우를 스캔해야 하는 질의는 디스크로부터 메모리로 데이터를 가져오는 대역폭이 큰 병목이다. 
+
+분석용 DB 개발자는 메인 메모리에서 CPU 캐시로 가는 대역폭을 사용하고 CPU 명령 파이프라인에서 brnch misprediction, bubble을 피하며 SIMD(single-instruction-multi-data)를 사용하게끔 신경써야한다. 
+
+또한 압축된 컬럼 데이터 덩어리를 바로 연산할 수 있게 하는 기법을 vectorized processing이라고 한다.
+
+## 칼럼 저장소의 순서 정렬
+
+칼럼별로 저장됐을지라도 데이터는 한 번에 전체 로우를 정렬해야 한다.
+
+정렬된 순서의 장점
+
+- 그룹화 혹은 필터링 질의에 도움이 됨
+- 칼럼 압축에 도움이 됨
+
+## Aggregation in Data warehouse
+
+데이터 웨어하우스에서는 materialized aggregate, 즉 max, avg 등의 집계 함수를 사용하는 경우가 많다.
+
+따라서 질의가 자주 사용하는 일부 카운트나 합을 캐시하는 방법으로 materialized view를 사용한다.
+
+보통 OLTP의 경우, 데이터 갱신 시 뷰도 갱신해야 하기 때문에 cost가 높아 잘 사용하지 않는다.
+
+그러나 Data warehouse의 경우 읽기 비중이 훨씬 높기 때문에 합리적이다.
+
+**Data cube** 혹은 **OLAP cube**라고 알려진 구체화 뷰는 구체화 뷰의 일종이다.
