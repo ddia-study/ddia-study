@@ -74,6 +74,8 @@ Redis Redlock : https://redis.io/docs/reference/patterns/distributed-locks/
 
 시스템이 Byzantine fault-tolerant하게 만드는 프로토콜은 매우 복잡하고 내결함성을 지닌 임베디드 시스템은 하드웨어 수준의 지원에 의존한다. 
 
+관련해서 볼만한 자료 : https://medium.com/loom-network-korean/%EB%B8%94%EB%A1%9D%EC%B2%B4%EC%9D%B8%EC%9D%98-%EA%B8%B0%EB%B3%B8-%EC%9B%90%EB%A6%AC-%EC%9D%B4%ED%95%B4-%EC%A0%9C-1%EB%B6%80-%EB%B9%84%EC%9E%94%ED%8B%B4-%EA%B2%B0%ED%95%A8-%EB%B0%A9%EC%A7%80-89ad2b7d1b65
+
 ## 약한 형태의 거짓말
 
 약한 형태의 거짓말로부터 보호해주는 메커니즘은 완전한 비잔팀 내결함성을 지니지는 않지만 그럼에도 더욱 나은 신뢰성으로 향하는 간단하고 실용적인 발걸음이다.
